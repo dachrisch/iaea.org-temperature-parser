@@ -1,0 +1,5 @@
+simple parser for www.iaea.org update sites to gain access to feedwater nozzle and reactor bottom temps.
+
+usage: (in src/) python fukushima_temperature.py
+
+creates a file called fukushima.csv where all available update sites with their corresponding temperatures are listed.
