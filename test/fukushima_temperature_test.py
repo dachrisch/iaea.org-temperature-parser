@@ -9,44 +9,11 @@ import unittest
 import sys
 sys.path.append("../src")
 import logging
-logging.basicConfig(level=logging.INFO)
+#logging.basicConfig(level=logging.INFO)
 
 log = logging.getLogger('test')
 
-from fukushima_temperature import UnitSentenceParser, UpdateLogSiteParser, SiteLinksParser
-
-class FukushimaSiteReports(object):
-    def __init__(self):
-        self.update_log_parser = UpdateLogSiteParser()
-        self.unit_reports = {}
-    
-    def _read_from_url(self, url):
-        from urllib import urlopen
-        update_site = urlopen(url)
-        log.debug('reading from update site (%s)' % update_site.url)
-        content = update_site.read()
-        return content
-
-    def read_update_sites(self, update_site='http://www.iaea.org/newscenter/news/tsunamiupdate01.html'):
-        count = 0
-
-        update_log_sites = SiteLinksParser().parse_log_sites(self._read_from_url(update_site))
-
-        for update_log_site in update_log_sites:
-            log.info('parsing update site [%s]' % update_log_site.to_url())
-            self.unit_reports[update_log_site.date] = self.update_log_parser.parse_to_unit_reports(self._read_from_url(update_log_site.to_url()))
-            log.debug('%s: %s' % (update_log_site.to_url(), unit_reports))
-            count += 1
-            if count > 5: break
-            
-        return self.unit_reports
-    
-    def to_csv(self):
-        csv = 'date;unit_1_'
-        for date, unit_report in self.unit_reports.iteritems():
-            csv += '%(date)s;%(unit)s;%(feedwater_nozzle_temp)s;%(reactor_bottom_temp)s'
-            
-        return csv
+from fukushima_temperature import UnitSentenceParser, UpdateLogSiteParser, FukushimaSiteReports
 
 class FukushimaTemperatureSentenceBasedTestCase(unittest.TestCase):
 
@@ -135,7 +102,6 @@ class FukushimaTemperatureSentenceBasedTestCase(unittest.TestCase):
             content = file.read()
         units_reports = UpdateLogSiteParser().parse_to_unit_reports(content)
 
-        print(units_reports)
         self.assertEqual(len(units_reports), 2)
         self.assertEqual(units_reports['1'].unit, '1')
         self.assertEqual(units_reports['3'].unit, '3')
@@ -147,11 +113,17 @@ class FukushimaTemperatureSentenceBasedTestCase(unittest.TestCase):
         units_reports = UpdateLogSiteParser().parse_to_unit_reports(content)
 
         reports = FukushimaSiteReports()
-        reports.unit_reports = units_reports
-        
-        self.assertEqual(reports.to_csv(), '22/04/11;1234')
+        reports.unit_reports = {'042211' : units_reports}
+
+        (header, csv_line) = reports.to_csv().split('\n')
+
+        self.assertEqual(header, 'date;feedwater_nozzle_temp_unit_1;feedwater_nozzle_temp_unit_2;feedwater_nozzle_temp_unit_3;reactor_bottom_temp_unit_1;reactor_bottom_temp_unit_2;reactor_bottom_temp_unit_3')
+        self.assertEqual(csv_line, '22/04/11;138;123;75;111;-1;111')
     def xtest_live_fetch_first_site_and_all_depending(self):
-        print FukushimaSiteReports().read_update_sites('http://www.iaea.org/newscenter/news/tsunamiupdate01.html')
+        report_handler = FukushimaSiteReports()
+        report_handler.update_from_update_sites('http://www.iaea.org/newscenter/news/tsunamiupdate01.html')
+
+        print report_handler.to_csv()
 
 
 if __name__ == '__main__':
